@@ -29,43 +29,56 @@ void GridPricer::SetPayout(std::function<double(double)> payoff) {
 }
 
 
-void GridPricer::StepBack(double timePoint, FdType method) {
+void GridPricer::StepBack(double timePoint, FdType method, std::function<double(const double&, const double&)> mask) {
     if (m_timeAnchor < 0)
         throw std::runtime_error("SetPayout not called yet");
 
-    for (; m_timeAnchor >= 0 && m_timeRanges[m_timeAnchor] >= timePoint; --m_timeAnchor) {
-
-    }
-
     // TODO: for hull white, when parameters are time-dependent, need to test if should use t0 or t1 to generate the parameters
-    if (method == Explicit) {
+    for (; m_timeAnchor >= 0 && m_timeRanges[m_timeAnchor] >= timePoint; --m_timeAnchor) {
+        // set up variables
         std::vector<double> pd, pm, pu;
-        std::vector<double> temp(m_xRanges.size());
-        for (; m_timeAnchor >= 0 && m_timeRanges[m_timeAnchor] >= timePoint; --m_timeAnchor) {
-            double &t0 = m_timeRanges[m_timeAnchor], &t1 = m_timeRanges[m_timeAnchor + 1];
-            std::tie(pd, pm, pu) = m_diffusionPDE->GetExplicitParameters(m_xRanges, t0, t1);
+        double &t0 = m_timeRanges[m_timeAnchor], &t1 = m_timeRanges[m_timeAnchor + 1];
+        double lb = m_lowerBound(m_xRanges.front(), t0), ub = m_upperBound(m_xRanges.back(), t0);
+
+        // finite difference
+        if (method == Explicit || method == CrankNicolson) {
+            std::vector<double> temp(m_xRanges.size());
+            if (method == Explicit)
+                std::tie(pd, pm, pu) = m_diffusionPDE->GetParameters(m_xRanges, t0, t1, Explicit);
+            else  // crank nicolson parameter is half of that of explicit
+                std::tie(pd, pm, pu) = m_diffusionPDE->GetParameters(m_xRanges, t0, t1, Explicit, 2);
 
             for(size_t j = 1; j < m_xRanges.size() - 1; ++j)
                 temp[j] = pd[j - 1] * m_states[j - 1] + pm[j - 1] * m_states[j] + pu[j - 1] * m_states[j + 1];
-
             m_states.swap(temp);
-            m_states[0] = m_lowerBound(m_xRanges.front(), t0);
-            m_states.back() = m_upperBound(m_xRanges.back(), t0);
         }
-    } else if (method == Implicit) {
-        PricerHelper PH(m_xRanges.size() - 2);
-        std::vector<double> pd, pm, pu;
-        for(; m_timeAnchor >= 0 && m_timeRanges[m_timeAnchor] >= timePoint; --m_timeAnchor) {
-            double &t0 = m_timeRanges[m_timeAnchor], &t1 = m_timeRanges[m_timeAnchor + 1];
-            std::tie(pd, pm, pu) = m_diffusionPDE->GetImplicitParameters(m_xRanges, t0, t1);
 
-            double lb = m_lowerBound(m_xRanges.front(), t0), ub = m_upperBound(m_xRanges.back(), t0);
-            m_states[1] -= pd[0] * lb;
-            m_states.rbegin()[1] -= pu.back() * ub;
-            m_states = PH.SolveTridiagonal(pd, pm, pu, m_states, 1);
-            m_states.front() = lb;
-            m_states.back() = ub;
+        if (method == Implicit || method == CrankNicolson || method == SOR) {
+            PricerHelper PH(m_xRanges.size() - 2);
+            if (method == CrankNicolson)  // crank nicolson parameter is half of that of implicit
+                std::tie(pd, pm, pu) = m_diffusionPDE->GetParameters(m_xRanges, t0, t1, Implicit, 2);
+            else
+                std::tie(pd, pm, pu) = m_diffusionPDE->GetParameters(m_xRanges, t0, t1, Implicit);
+
+            if (method == SOR) {
+                std::vector<double> guess = m_states;
+                m_states[1] -= pd[0] * lb;
+                m_states.rbegin()[1] -= pu.back() * ub;
+                PricerHelper::PrintVector(m_states);
+                m_states = PH.SolveSOR(pd, pm, pu, m_states, guess);
+            } else {
+                m_states[1] -= pd[0] * lb;
+                m_states.rbegin()[1] -= pu.back() * ub;
+                m_states = PH.SolveTridiagonal(pd, pm, pu, m_states, 1);
+            }
         }
+
+        if(mask)
+            for(auto it1=m_states.begin(), it2=m_xRanges.begin(); it1 != m_states.end(); it1++, it2++)
+                *it1 = mask(*it1, *it2);
+
+        m_states.front() = lb;
+        m_states.back() = ub;
     }
 }
 

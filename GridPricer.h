@@ -14,12 +14,8 @@
 
 #include "DiffusionPDE.h"
 #include "PricerHelper.h"
+#include "Types.h"
 
-enum FdType {
-    Explicit,
-    Implicit,
-    Mixed
-};
 
 class GridPricer {
 private:
@@ -39,7 +35,7 @@ public:
 
     virtual ~GridPricer() = default;
 
-    void StepBack(double timePoint=0, FdType method=Explicit);
+    void StepBack(double timePoint=0, FdType method=Explicit, std::function<double(const double&, const double&)> mask = {});
     void SetPayout(std::function<double(double)> payoff);
     double GetValue(size_t pos) const;
     inline const std::vector<double>& GetValues() const { return m_states; };

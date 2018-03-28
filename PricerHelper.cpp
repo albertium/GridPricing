@@ -4,6 +4,7 @@
 
 #include "PricerHelper.h"
 
+
 std::vector<double> PricerHelper::GetLinSpace(const double &start, const double &end, const size_t &steps) {
     std::vector<double> result(steps + 1);
     result[0] = start;
@@ -38,4 +39,43 @@ std::vector<double> PricerHelper::SolveTridiagonal(const std::vector<double> &pd
     }
 
     return result;
+}
+
+
+std::vector<double> PricerHelper::SolveSOR(const std::vector<double> &pd, const std::vector<double> &pm,
+                                           const std::vector<double> &pu, const std::vector<double> &d,
+                                           std::vector<double> guess, const std::function<double(double)> &filter,
+                                           const double &omega, const double &tol) {
+    assert(pd.size() == pm.size());
+    assert(pm.size() == pu.size());
+    assert(pm.size() + 2 == guess.size());
+
+    double err;
+    size_t count = 0;
+
+    do {
+        err = 0.0;
+        if(filter) {
+            for(size_t i = 0; i < pm.size(); ++i)
+                guess[i + 1] = filter((1 - omega) * guess[i + 1]
+                                       + omega * (d[i] - pd[i] * guess[i] - pu[i] * guess[i + 2]) / pm[i]);
+        } else {
+            for(size_t i = 0; i < pm.size(); ++i) {
+                double r = omega / pm[i] * (d[i] - pd[i] * guess[i] - pm[i] * guess[i + 1] - pu[i] * guess[i + 2]);
+                guess[i + 1] = guess[i + 1] + r;
+                err += abs(r);
+            }
+        }
+        count++;
+    } while (err > tol * tol && count < 100);
+
+    return guess;
+}
+
+double PricerHelper::GetBlackScholesPrice(double S, double K, double r, double q, double sig, double T) {
+    double sig2 = sig * sig;
+    double sqrt_T = sqrt(T);
+    double d1 = (log(S / K) + (r - q + sig2 / 2) * T) / sig / sqrt_T;
+    double d2 = d1 - sig * sqrt_T;
+    return S * exp(-q*T) * NormalCDF(d1) - K * exp(-r*T) * NormalCDF(d2);
 }
