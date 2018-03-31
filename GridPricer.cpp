@@ -4,8 +4,6 @@
 
 #include "GridPricer.h"
 
-#include <cassert>
-
 
 GridPricer::GridPricer(
         std::vector<double> xRanges,
@@ -54,7 +52,6 @@ void GridPricer::StepBack(double timePoint, FdType method, std::function<double(
         }
 
         if (method == Implicit || method == CrankNicolson || method == SOR) {
-            PricerHelper PH(m_xRanges.size() - 2);
             if (method == CrankNicolson)  // crank nicolson parameter is half of that of implicit
                 std::tie(pd, pm, pu) = m_diffusionPDE->GetParameters(m_xRanges, t0, t1, Implicit, 2);
             else
@@ -65,11 +62,11 @@ void GridPricer::StepBack(double timePoint, FdType method, std::function<double(
                 m_states[1] -= pd[0] * lb;
                 m_states.rbegin()[1] -= pu.back() * ub;
                 PricerHelper::PrintVector(m_states);
-                m_states = PH.SolveSOR(pd, pm, pu, m_states, guess);
+                m_states = PricerHelper::SolveSOR(pd, pm, pu, m_states, guess);
             } else {
                 m_states[1] -= pd[0] * lb;
                 m_states.rbegin()[1] -= pu.back() * ub;
-                m_states = PH.SolveTridiagonal(pd, pm, pu, m_states, 1);
+                m_states = PricerHelper::SolveTridiagonal(pd, pm, pu, m_states, 1);
             }
         }
 

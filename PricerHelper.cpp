@@ -24,18 +24,19 @@ std::vector<double> PricerHelper::SolveTridiagonal(const std::vector<double> &pd
     std::vector<double> result(pm.size() + 2*offset);
 
     // forward
-    m_pu_p[0] = pu[0] / pm[0];
-    m_d_p[0] = d[offset] / pm[0];
+    std::vector<double> pu_p(pm.size()), d_p(pm.size());
+    pu_p[0] = pu[0] / pm[0];
+    d_p[0] = d[offset] / pm[0];
     for(size_t i = 1; i < pm.size(); ++i) {
-        double den = pm[i] - pd[i] * m_pu_p[i - 1];
-        m_pu_p[i] = pu[i] / den;
-        m_d_p[i] = (d[offset + i] - pd[i] * m_d_p[i - 1]) / den;
+        double den = pm[i] - pd[i] * pu_p[i - 1];
+        pu_p[i] = pu[i] / den;
+        d_p[i] = (d[offset + i] - pd[i] * d_p[i - 1]) / den;
     }
 
     // backward
-    result.rbegin()[offset] = m_d_p.back();
+    result.rbegin()[offset] = d_p.back();
     for(auto i = static_cast<int>(pm.size()) - 2; i >= 0; --i) {
-        result[i + offset] = m_d_p[i] - m_pu_p[i] * result[i + 1 + offset];
+        result[i + offset] = d_p[i] - pu_p[i] * result[i + 1 + offset];
     }
 
     return result;

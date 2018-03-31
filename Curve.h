@@ -6,6 +6,9 @@
 #define HULLWHITE_CURVE_H
 
 #include <vector>
+#include <algorithm>
+
+#include "PricerHelper.h"
 
 
 class Curve {
@@ -14,6 +17,7 @@ private:
     double leftGrad_, rightGrad_;
 
 public:
+    Curve() = default;
     Curve(
             std::vector<double> xValues,
             std::vector<double> yValues,
@@ -30,7 +34,18 @@ public:
 
     virtual ~Curve() = default;
 
-    virtual double operator()(double x) const;
+    virtual double operator()(const double &x, int order=0) const;
+};
+
+
+class CubicSpline : public Curve {
+private:
+    std::vector<double> m_a, m_b, m_c, m_d, m_Xs;
+
+public:
+    CubicSpline(std::vector<double> xValues, std::vector<double> yValues);
+    ~CubicSpline() override = default;
+    double operator()(const double &x, int order=0) const override;
 };
 
 

@@ -14,17 +14,11 @@
 
 
 class PricerHelper {
-private:
-    std::vector<double> m_pu_p, m_d_p, m_temp;
-
 public:
-    explicit PricerHelper(size_t size) : m_pu_p(size), m_d_p(size), m_temp(size) {};
-    virtual ~PricerHelper() = default;
-
     // Linear algebra
     static std::vector<double> GetLinSpace(const double &start, const double &end, const size_t &steps);
 
-    std::vector<double> SolveTridiagonal(
+    static std::vector<double> SolveTridiagonal(
             const std::vector<double>& pd,
             const std::vector<double>& pm,
             const std::vector<double>& pu,

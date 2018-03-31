@@ -90,9 +90,8 @@ TestOption::TestOption() {
               << PricerHelper::CalculateRMSE(pricer.GetValues(), exact) << std::endl;
 
     // test tridiagonal solver
-    PricerHelper PH(3);
-    auto result = PH.SolveTridiagonal({0, 1, 2}, {1, 2, 1}, {1, 3, 0}, {3, 14, 7});
-    std::cout << "Test tridiagonal: " << PH.CalculateRMSE(result, {1, 2, 3}) << std::endl;
+    auto result = PricerHelper::SolveTridiagonal({0, 1, 2}, {1, 2, 1}, {1, 3, 0}, {3, 14, 7});
+    std::cout << "Test tridiagonal: " << PricerHelper::CalculateRMSE(result, {1, 2, 3}) << std::endl;
 
     // test SOR solver
     result = PricerHelper::SolveSOR({1, 1}, {3, 3}, {1, 1}, {10, 15}, {1, 0, 0, 4});
