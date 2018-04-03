@@ -26,9 +26,9 @@ EuropeanOption::EuropeanOption(double S,
     // define payoff
     std::function<double(double)> payoff;
     if(type == OptionType::Call)
-        payoff = Curve(K, 0.0, 0.0, 1.0);
+        payoff = Spline::MakeLinear(K, 0.0, 0.0, 1.0);
     else if(type == OptionType::Put)
-        payoff = Curve(K, 0.0, -1.0,0.0);
+        payoff = Spline::MakeLinear(K, 0.0, -1.0, 0.0);
     else
         throw std::runtime_error("unrecognized option type");
 
@@ -75,19 +75,67 @@ TestOption::TestOption() {
     pricer.SetPayout(payout);
     pricer.StepBack(0);
     std::cout << "Test explicit finite difference: "
-              << PricerHelper::CalculateRMSE(pricer.GetValues(), exact) << std::endl;
+              << PricerHelper::CalculateRMSE(pricer.GetValues(), exact) << " (0.0784)" <<  std::endl;
 
     // test implicit finite difference
     pricer.SetPayout(payout);
     pricer.StepBack(0, Implicit);
     std::cout << "Test implicit finite difference: "
-              << PricerHelper::CalculateRMSE(pricer.GetValues(), exact) << std::endl;
+              << PricerHelper::CalculateRMSE(pricer.GetValues(), exact) << " (0.1517)" << std::endl;
 
     // test Crank Nicolson finite difference
     pricer.SetPayout(payout);
     pricer.StepBack(0, CrankNicolson);
     std::cout << "Test Crank Nicolson finite difference: "
-              << PricerHelper::CalculateRMSE(pricer.GetValues(), exact) << std::endl;
+              << PricerHelper::CalculateRMSE(pricer.GetValues(), exact) << " (0.0407)" <<  std::endl;
+
+    // test American option
+    AmericanOption opt(41, 40, 0.04, 0.02, 0.35, 0.75);
+    auto price = opt.GetPrice();
+    std::cout << "Test American option: " << abs(price / 4.083817051176386 - 1) << std::endl;
+
+    // test linear spline
+    Spline payoff = Spline::MakeLinear(5, 0, -1, 2);
+    std::vector<double> vec{2, 3, 4, 5, 6, 7};
+    for (auto &x : vec)
+        x = payoff(x);
+    std::cout << "Test linear piecewise: " << PricerHelper::CalculateRMSE(vec, {3, 2, 1, 0, 2, 4}) << std::endl;
+
+    // test cubic spline
+    auto xs = PricerHelper::GetLinSpace(-3, 3, 10);
+    std::vector<double> ys(xs.size()), vec2;
+    std::transform(xs.begin(), xs.end(), ys.begin(), [](double x) { return x * x * x; });
+    Spline cubic = Spline::MakeCubic(xs, ys);
+    vec.resize(xs.size());
+    std::transform(xs.begin(), xs.end(), vec.begin(), cubic);
+    std::cout << "Test cubic: " << PricerHelper::CalculateRMSE(vec, ys) << std::endl;
+
+    // test cubic derivatives
+    Spline deriv = cubic.GetDerivative(), deriv2 = cubic.GetDerivative(2);
+    xs = PricerHelper::GetLinSpace(-4, 4, 50);
+    double dx = 0.000001;
+    vec.resize(50);
+    vec2.resize(50);
+    std::transform(xs.begin(), xs.end(), vec.begin(), deriv);
+    std::transform(xs.begin(), xs.end(), vec2.begin(),
+                   [cubic, dx](double x ) { return (cubic(x + dx) - cubic(x - dx)) / 2 / dx; });
+    std::cout << "Test cubic 1st derivative: " << PricerHelper::CalculateRMSE(vec, vec2) << std::endl;
+
+    std::transform(xs.begin(), xs.end(), vec.begin(), deriv2);
+    std::transform(xs.begin(), xs.end(), vec2.begin(),
+                   [cubic, dx](double x ) { return (cubic(x + dx) - 2*cubic(x) + cubic(x - dx)) / dx / dx; });
+    std::cout << "Test cubic 2nd derivative: " << PricerHelper::CalculateRMSE(vec, vec2) << std::endl;
+
+    // test Ax=Bd
+    auto res = PricerHelper::SolveTridiagonalAxBd({}, {{1, 2, 3}, {3, 4, 5}, {5, 6, 7}}, {1, 2, 3}, {}, {1, 2});
+    std::cout << "Test Ax=Bd (1): " << PricerHelper::CalculateRMSE(res, {9, 26, 42}) << std::endl;
+    res = PricerHelper::SolveTridiagonalAxBd({}, {{1, 2, 3}, {3, 4, 5}, {5, 6, 7}}, {1, 2, 3});
+    std::cout << "Test Ax=Bd (2): " << PricerHelper::CalculateRMSE(res, {14, 26, 38}) << std::endl;
+    res = PricerHelper::SolveTridiagonalAxBd({{1, 2, 3}, {3, 4, 5}, {5, 6, 7}}, {}, {9, 26, 42}, {1, 2});
+    std::cout << "Test Ax=Bd (3): " << PricerHelper::CalculateRMSE(res, {1, 2, 3}) << std::endl;
+    res = PricerHelper::SolveTridiagonalAxBd({{1, 2, 1}, {3, 4, 5}, {5, 6, 7}}, {}, {8, 26, 38});
+    std::cout << "Test Ax=Bd (4): " << PricerHelper::CalculateRMSE(res, {1, 2, 3}) << std::endl;
+
 
     // test tridiagonal solver
     auto result = PricerHelper::SolveTridiagonal({0, 1, 2}, {1, 2, 1}, {1, 3, 0}, {3, 14, 7});

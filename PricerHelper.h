@@ -26,6 +26,16 @@ public:
             size_t offset = 0
     );  // will pad offset 0s in front and in the end of the returned vector
 
+    static std::vector<double> SolveTridiagonal(const std::vector<std::vector<double>> A, const std::vector<double> d);
+
+    static std::vector<double> SolveTridiagonalAxBd(
+            std::vector<std::vector<double>> A,
+            std::vector<std::vector<double>> B,
+            std::vector<double> d,
+            std::vector<double> xBounds = {},
+            std::vector<double> dBounds = {}
+    );  // solve for x in Ax = Bd where A and B are tri-diagonals
+
     static std::vector<double> SolveSOR(
             const std::vector<double>& pd,
             const std::vector<double>& pm,

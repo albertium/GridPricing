@@ -12,40 +12,26 @@
 
 
 class Curve {
-private:
-    std::vector<double> xValues_, yValues_;
-    double leftGrad_, rightGrad_;
-
 public:
     Curve() = default;
-    Curve(
-            std::vector<double> xValues,
-            std::vector<double> yValues,
-            double leftGrad=0.0,
-            double rightGrad=0.0
-    ) : xValues_(std::move(xValues)), yValues_(std::move(yValues)), leftGrad_(leftGrad), rightGrad_(rightGrad) {};
-
-    Curve(
-            double xValue,
-            double yValue,
-            double leftGrad=0.0,
-            double rightGrad=0.0
-    ) : Curve(std::vector<double>(1, xValue), std::vector<double>(1, yValue), leftGrad, rightGrad) {};
-
     virtual ~Curve() = default;
-
-    virtual double operator()(const double &x, int order=0) const;
+    virtual double operator()(const double &x) const = 0;
 };
 
 
-class CubicSpline : public Curve {
+class Spline : public Curve {
 private:
-    std::vector<double> m_a, m_b, m_c, m_d, m_Xs;
+    std::vector<std::vector<double>> m_coefs;
+    std::vector<double> m_xs;
 
 public:
-    CubicSpline(std::vector<double> xValues, std::vector<double> yValues);
-    ~CubicSpline() override = default;
-    double operator()(const double &x, int order=0) const override;
+    Spline(std::vector<double> xs, std::vector<std::vector<double>> coefs);
+    ~Spline() override = default;
+    double operator()(const double &x) const override;
+    Spline GetDerivative(size_t order = 1) const;
+    static Spline MakeLinear(std::vector<double> xs, std::vector<double> ys, double left_grad = 0, double right_grad = 0);
+    static Spline MakeLinear(double x, double y, double left_grad, double right_grad);
+    static Spline MakeCubic(std::vector<double> xs, std::vector<double> ys);
 };
 
 
